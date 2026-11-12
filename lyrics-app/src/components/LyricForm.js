@@ -1,7 +1,7 @@
 // 保存画面と編集画面で共通の入力フォーム。
 // 曲名・アーティスト名は、過去に保存した内容から候補を出します。
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import ClearableInput from './ClearableInput';
 import { useLyrics } from '../lib/LyricsContext';
 import { artistCandidates, findArtistForTitle, titleCandidates } from '../lib/suggest';
@@ -31,10 +31,13 @@ export default function LyricForm({ values, onChange }) {
   // いまフォーカス（カーソルがある）している入力欄。候補を出すかどうかの判断に使う。
   const [focused, setFocused] = useState(null);
 
-  // キーボードを閉じる前に候補をタップできるよう、少し待ってから隠す
-  function handleBlur() {
-    setTimeout(() => setFocused(null), 150);
-  }
+  // 候補は、キーボードが出ている間は表示したままにする。
+  // （入力欄から指が離れたときに隠すと、候補をタップする前に消えてしまうため）
+  // キーボードを閉じたときだけ隠す。
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidHide', () => setFocused(null));
+    return () => sub.remove();
+  }, []);
 
   // 曲名を入力したとき。同じ曲名が過去にあり、アーティスト名が空なら自動で入れる。
   function changeTitle(title) {
@@ -70,7 +73,6 @@ export default function LyricForm({ values, onChange }) {
         value={values.text}
         onChangeText={(text) => onChange({ text })}
         onFocus={() => setFocused('text')}
-        onBlur={handleBlur}
         placeholder="Spotify や LINE MUSIC の歌詞をコピーして、ここに貼り付け"
         textAlignVertical="top"
       />
@@ -81,7 +83,6 @@ export default function LyricForm({ values, onChange }) {
         value={values.title}
         onChangeText={changeTitle}
         onFocus={() => setFocused('title')}
-        onBlur={handleBlur}
         placeholder="例：〇〇〇"
       />
       <Chips title="過去に保存した曲名（タップで入力）" items={titleItems} onPick={pickTitle} />
@@ -91,7 +92,6 @@ export default function LyricForm({ values, onChange }) {
         value={values.artist}
         onChangeText={(artist) => onChange({ artist })}
         onFocus={() => setFocused('artist')}
-        onBlur={handleBlur}
         placeholder="例：〇〇〇"
       />
       <Chips
@@ -105,7 +105,6 @@ export default function LyricForm({ values, onChange }) {
         value={values.url}
         onChangeText={(url) => onChange({ url })}
         onFocus={() => setFocused('url')}
-        onBlur={handleBlur}
         placeholder="Spotify などの「共有」→「リンクをコピー」で出るURLを貼る"
         keyboardType="url"
         autoCapitalize="none"
@@ -122,7 +121,6 @@ export default function LyricForm({ values, onChange }) {
         value={values.memo}
         onChangeText={(memo) => onChange({ memo })}
         onFocus={() => setFocused('memo')}
-        onBlur={handleBlur}
         placeholder="任意"
         textAlignVertical="top"
       />
