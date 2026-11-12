@@ -9,6 +9,8 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
 const DAYS_AHEAD = 30;
+// iOS が予約を許す上限は64件。少し余裕を見て60件までにする。
+const MAX_SCHEDULED = 60;
 
 // パソコンのブラウザ（Web版）で画面を確認するときは、通知の機能が無いので何もしない。
 const isSupported = Platform.OS !== 'web';
@@ -74,23 +76,34 @@ async function doReschedule(lyrics, settings) {
   if (!settings.notificationsEnabled) return 'off';
   if (lyrics.length === 0) return 'empty';
 
+  // オンになっている時刻（アラーム）だけを予約する。
+  const alarms = settings.alarms.filter((a) => a.enabled);
+  if (alarms.length === 0) return 'noalarm';
+
   const granted = await requestPermission();
   if (!granted) return 'denied';
 
+  // 時刻が多いほど1つあたりの日数が減る（全体で MAX_SCHEDULED 件に収める）。
+  const days = Math.min(DAYS_AHEAD, Math.floor(MAX_SCHEDULED / alarms.length));
+  const sequence = pickRandomSequence(lyrics, days * alarms.length);
   const now = new Date();
-  const first = new Date();
-  first.setHours(settings.hour, settings.minute, 0, 0);
-  // 今日の時刻をもう過ぎていたら、明日から。
-  if (first <= now) first.setDate(first.getDate() + 1);
 
-  const sequence = pickRandomSequence(lyrics, DAYS_AHEAD);
-  for (let i = 0; i < DAYS_AHEAD; i++) {
-    const date = new Date(first);
-    date.setDate(first.getDate() + i);
-    await Notifications.scheduleNotificationAsync({
-      content: buildContent(sequence[i]),
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date },
-    });
+  for (let a = 0; a < alarms.length; a++) {
+    const alarm = alarms[a];
+    const first = new Date();
+    first.setHours(alarm.hour, alarm.minute, 0, 0);
+    // 今日の時刻をもう過ぎていたら、明日から。
+    if (first <= now) first.setDate(first.getDate() + 1);
+
+    for (let d = 0; d < days; d++) {
+      const date = new Date(first);
+      date.setDate(first.getDate() + d);
+      await Notifications.scheduleNotificationAsync({
+        // 同じ日・同じ時刻の順番がずれないように、時刻ごとに別の歌詞を割り当てる
+        content: buildContent(sequence[d * alarms.length + a]),
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date },
+      });
+    }
   }
   return 'scheduled';
 }

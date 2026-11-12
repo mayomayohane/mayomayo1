@@ -100,6 +100,21 @@ export default function LyricForm({ values, onChange }) {
         onPick={pickArtist}
       />
 
+      <Text style={styles.label}>曲のURL（任意）</Text>
+      <ClearableInput
+        value={values.url}
+        onChangeText={(url) => onChange({ url })}
+        onFocus={() => setFocused('url')}
+        onBlur={handleBlur}
+        placeholder="Spotify などの「共有」→「リンクをコピー」で出るURLを貼る"
+        keyboardType="url"
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+      <Text style={styles.hint}>
+        貼ると、タップや通知から直接その曲を開けます。空欄なら、設定で選んだ音楽アプリで検索します。
+      </Text>
+
       <Text style={styles.label}>メモ（なぜ刺さったか・そのときの気持ちなど）</Text>
       <ClearableInput
         multiline

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useLyrics } from '../lib/LyricsContext';
+import { openLyricLink } from '../lib/musicLinks';
 import { colors, lyricFont } from '../lib/theme';
 
 function formatDate(iso) {
@@ -10,10 +11,11 @@ function formatDate(iso) {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-function LyricCard({ lyric, highlighted, onEdit, onLongPress }) {
+function LyricCard({ lyric, highlighted, onPress, onEdit, onLongPress }) {
   const song = [lyric.title, lyric.artist].filter(Boolean).join(' / ');
   return (
     <Pressable
+      onPress={onPress}
       onLongPress={onLongPress}
       style={[styles.card, highlighted && styles.cardHighlighted]}
     >
@@ -31,8 +33,23 @@ function LyricCard({ lyric, highlighted, onEdit, onLongPress }) {
 }
 
 export default function ListScreen() {
-  const { lyrics, loaded, removeLyric } = useLyrics();
+  const { lyrics, loaded, settings, removeLyric } = useLyrics();
   const [shuffledId, setShuffledId] = useState(null);
+
+  // カードをタップ：曲のURL、なければ設定の音楽アプリで検索して開く
+  async function playLyric(lyric) {
+    try {
+      const opened = await openLyricLink(lyric, settings.musicApp);
+      if (!opened) {
+        Alert.alert(
+          '開く先がありません',
+          '曲のURLを編集画面で貼るか、通知の設定で使っている音楽アプリを選んでください。'
+        );
+      }
+    } catch {
+      Alert.alert('開けませんでした', 'リンクが正しいか確認してください。');
+    }
+  }
 
   function confirmDelete(lyric) {
     Alert.alert('この歌詞を削除しますか？', lyric.text.slice(0, 40), [
@@ -79,11 +96,14 @@ export default function ListScreen() {
           </Pressable>
         </View>
       }
-      ListFooterComponent={<Text style={styles.footer}>長押しで削除できます</Text>}
+      ListFooterComponent={
+        <Text style={styles.footer}>タップで曲を開く・長押しで削除できます</Text>
+      }
       renderItem={({ item }) => (
         <LyricCard
           lyric={item}
           highlighted={item.id === shuffledId}
+          onPress={() => playLyric(item)}
           onEdit={() => router.push({ pathname: '/edit', params: { id: item.id } })}
           onLongPress={() => confirmDelete(item)}
         />

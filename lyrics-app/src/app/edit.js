@@ -32,6 +32,7 @@ function EditForm({ lyric }) {
     title: lyric.title,
     artist: lyric.artist,
     memo: lyric.memo,
+    url: lyric.url ?? '', // 以前に保存した歌詞にはURLがないので空にする
   });
 
   const canSave = values.text.trim().length > 0 && values.title.trim().length > 0;

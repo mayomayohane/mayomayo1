@@ -6,7 +6,7 @@ import LyricForm from '../components/LyricForm';
 import { useLyrics } from '../lib/LyricsContext';
 import { colors } from '../lib/theme';
 
-const EMPTY = { text: '', title: '', artist: '', memo: '' };
+const EMPTY = { text: '', title: '', artist: '', memo: '', url: '' };
 
 export default function AddScreen() {
   const { addLyric } = useLyrics();
