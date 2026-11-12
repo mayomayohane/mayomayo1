@@ -27,11 +27,17 @@ function Stepper({ label, value, onMinus, onPlus }) {
   );
 }
 
+// 時刻を分単位で動かす。45分 +15分 → 次の時の00分、00分 −15分 → 前の時の45分のように繰り上がり・繰り下がりする。
+function shiftTime(alarm, minutesDelta) {
+  const total = (alarm.hour * 60 + alarm.minute + minutesDelta + 24 * 60) % (24 * 60);
+  return { hour: Math.floor(total / 60), minute: total % 60 };
+}
+
 // 届く時刻（アラーム）1件分の表示と操作
 function AlarmRow({ alarm, disabled, onChange, onRemove }) {
-  // 時は1時間ずつ、分は15分ずつ変える
+  // 時は1時間ずつ、分は15分ずつ変える（分は時をまたいで自動で進む）
   const changeHour = (d) => onChange({ hour: (alarm.hour + d + 24) % 24 });
-  const changeMinute = (d) => onChange({ minute: (alarm.minute + d + 60) % 60 });
+  const changeMinute = (d) => onChange(shiftTime(alarm, d));
 
   return (
     <View style={[styles.alarm, !alarm.enabled && styles.alarmOff]}>
