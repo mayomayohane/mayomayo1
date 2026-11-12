@@ -1,6 +1,7 @@
 // 【MVP③】保存した歌詞をランダムに通知する機能の設定画面
 import { useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import LyricPicker from '../components/LyricPicker';
 import { useLyrics } from '../lib/LyricsContext';
 import { MAX_ALARMS } from '../lib/storage';
 import { sendTestNotification } from '../lib/notifications';
@@ -9,6 +10,14 @@ import { colors } from '../lib/theme';
 
 const pad = (n) => String(n).padStart(2, '0');
 const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+const WEEK_LABELS = ['日', '月', '火', '水', '木', '金', '土']; // 0=日曜 … 6=土曜
+
+// 届ける歌詞の選び方の名前
+const POOL_TYPES = [
+  { key: 'all', label: '全部から' },
+  { key: 'album', label: 'アルバムから' },
+  { key: 'lyrics', label: '選んだ歌詞から' },
+];
 
 function Stepper({ label, value, onMinus, onPlus }) {
   return (
@@ -34,10 +43,40 @@ function shiftTime(alarm, minutesDelta) {
 }
 
 // 届く時刻（アラーム）1件分の表示と操作
-function AlarmRow({ alarm, disabled, onChange, onRemove }) {
+function AlarmRow({ alarm, albums, disabled, onChange, onRemove, onPickLyrics }) {
   // 時は1時間ずつ、分は15分ずつ変える（分は時をまたいで自動で進む）
   const changeHour = (d) => onChange({ hour: (alarm.hour + d + 24) % 24 });
   const changeMinute = (d) => onChange(shiftTime(alarm, d));
+
+  // 曜日のON/OFF（少なくとも1つは残す）
+  function toggleDay(day) {
+    const on = alarm.days.includes(day);
+    if (on && alarm.days.length === 1) {
+      Alert.alert('曜日が選ばれていません', '少なくとも1つの曜日を選んでください。');
+      return;
+    }
+    const days = on ? alarm.days.filter((d) => d !== day) : [...alarm.days, day].sort();
+    onChange({ days });
+  }
+
+  // 届ける歌詞の選び方を変える
+  function setPoolType(type) {
+    if (type === 'all') onChange({ pool: { type: 'all' } });
+    if (type === 'album') {
+      if (albums.length === 0) {
+        Alert.alert('アルバムがありません', '一覧画面で、先にアルバムを作ってください。');
+        return;
+      }
+      const current = alarm.pool.type === 'album' ? alarm.pool.albumId : null;
+      onChange({ pool: { type: 'album', albumId: current ?? albums[0].id } });
+    }
+    if (type === 'lyrics') {
+      onChange({ pool: { type: 'lyrics', lyricIds: alarm.pool.lyricIds ?? [] } });
+    }
+  }
+
+  const pool = alarm.pool;
+  const selectedAlbum = pool.type === 'album' ? albums.find((a) => a.id === pool.albumId) : null;
 
   return (
     <View style={[styles.alarm, !alarm.enabled && styles.alarmOff]}>
@@ -52,6 +91,7 @@ function AlarmRow({ alarm, disabled, onChange, onRemove }) {
           trackColor={{ true: colors.accent }}
         />
       </View>
+
       <View style={styles.steppers}>
         <Stepper
           label="時"
@@ -66,6 +106,65 @@ function AlarmRow({ alarm, disabled, onChange, onRemove }) {
           onPlus={() => changeMinute(15)}
         />
       </View>
+
+      <Text style={styles.subLabel}>届く曜日</Text>
+      <View style={styles.days}>
+        {WEEK_LABELS.map((label, day) => {
+          const on = alarm.days.includes(day);
+          return (
+            <Pressable
+              key={day}
+              onPress={() => toggleDay(day)}
+              disabled={disabled}
+              style={[styles.dayChip, on && styles.dayChipOn]}
+            >
+              <Text style={[styles.dayText, on && styles.dayTextOn]}>{label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={styles.subLabel}>届ける歌詞</Text>
+      <View style={styles.chips}>
+        {POOL_TYPES.map((t) => {
+          const on = pool.type === t.key;
+          return (
+            <Pressable
+              key={t.key}
+              onPress={() => setPoolType(t.key)}
+              disabled={disabled}
+              style={[styles.chip, on && styles.chipSelected]}
+            >
+              <Text style={[styles.chipText, on && styles.chipTextSelected]}>{t.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {pool.type === 'album' && (
+        <View style={styles.chips}>
+          {albums.map((a) => {
+            const on = selectedAlbum?.id === a.id;
+            return (
+              <Pressable
+                key={a.id}
+                onPress={() => onChange({ pool: { type: 'album', albumId: a.id } })}
+                disabled={disabled}
+                style={[styles.chip, on && styles.chipSelected]}
+              >
+                <Text style={[styles.chipText, on && styles.chipTextSelected]}>{a.name}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
+      {pool.type === 'lyrics' && (
+        <Pressable onPress={onPickLyrics} disabled={disabled} style={styles.pickButton}>
+          <Text style={styles.pickText}>歌詞を選ぶ（{(pool.lyricIds ?? []).length}件）</Text>
+        </Pressable>
+      )}
+
       <Pressable onPress={onRemove} hitSlop={8} style={styles.removeButton}>
         <Text style={styles.removeText}>この時刻を削除</Text>
       </Pressable>
@@ -74,8 +173,10 @@ function AlarmRow({ alarm, disabled, onChange, onRemove }) {
 }
 
 export default function SettingsScreen() {
-  const { lyrics, settings, updateSettings } = useLyrics();
+  const { lyrics, albums, settings, updateSettings } = useLyrics();
   const [busy, setBusy] = useState(false);
+  // 届ける歌詞を選んでいる時刻のid（開いていれば、歌詞の選択画面を表示する）
+  const [pickingAlarmId, setPickingAlarmId] = useState(null);
 
   async function apply(patch) {
     setBusy(true);
@@ -85,6 +186,11 @@ export default function SettingsScreen() {
         Alert.alert('Web版では通知を試せません', '通知は iPhone の Expo Go で確認してください。');
       } else if (result === 'noalarm') {
         Alert.alert('届く時刻がありません', '時刻を1つ以上オンにすると通知が届きます。');
+      } else if (result === 'emptypool') {
+        Alert.alert(
+          '届ける歌詞がありません',
+          '選んだアルバム・歌詞に、まだ歌詞が入っていません。一覧画面か、この画面の「歌詞を選ぶ」から入れてください。'
+        );
       } else if (result === 'denied') {
         Alert.alert(
           '通知が許可されていません',
@@ -110,7 +216,19 @@ export default function SettingsScreen() {
       Alert.alert('これ以上追加できません', `時刻は最大${MAX_ALARMS}件までです。`);
       return;
     }
-    apply({ alarms: [...settings.alarms, { id: newId(), hour: 21, minute: 0, enabled: true }] });
+    apply({
+      alarms: [
+        ...settings.alarms,
+        {
+          id: newId(),
+          hour: 21,
+          minute: 0,
+          enabled: true,
+          days: [0, 1, 2, 3, 4, 5, 6],
+          pool: { type: 'all' },
+        },
+      ],
+    });
   }
 
   function removeAlarm(id) {
@@ -133,13 +251,31 @@ export default function SettingsScreen() {
     }
   }
 
+  // 届ける歌詞を選ぶ画面
+  const pickingAlarm = settings.alarms.find((a) => a.id === pickingAlarmId);
+  if (pickingAlarm) {
+    return (
+      <LyricPicker
+        title="この時刻に届ける歌詞"
+        lyrics={lyrics}
+        initialIds={pickingAlarm.pool.lyricIds ?? []}
+        doneLabel="決定"
+        onCancel={() => setPickingAlarmId(null)}
+        onDone={(ids) => {
+          updateAlarm(pickingAlarm.id, { pool: { type: 'lyrics', lyricIds: ids } });
+          setPickingAlarmId(null);
+        }}
+      />
+    );
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.card}>
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.rowTitle}>毎日ランダムに届ける</Text>
-            <Text style={styles.rowSub}>保存した歌詞から1つを選んで通知します</Text>
+            <Text style={styles.rowTitle}>ランダムに届ける</Text>
+            <Text style={styles.rowSub}>保存した歌詞から選んで通知します</Text>
           </View>
           <Switch
             value={settings.notificationsEnabled}
@@ -154,16 +290,18 @@ export default function SettingsScreen() {
             <View style={styles.divider} />
             <Text style={styles.rowTitle}>届く時刻</Text>
             <Text style={styles.rowSub}>
-              時刻は好きなだけ追加できます（最大{MAX_ALARMS}件）。時刻が増えるほど、先の予約日数は短くなります。
+              時刻は好きなだけ追加できます（最大{MAX_ALARMS}件）。時刻と曜日ごとに、届ける歌詞を選べます。時刻が増えるほど、先の予約日数は短くなります。
             </Text>
 
             {settings.alarms.map((alarm) => (
               <AlarmRow
                 key={alarm.id}
                 alarm={alarm}
+                albums={albums}
                 disabled={busy}
                 onChange={(patch) => updateAlarm(alarm.id, patch)}
                 onRemove={() => removeAlarm(alarm.id)}
+                onPickLyrics={() => setPickingAlarmId(alarm.id)}
               />
             ))}
 
@@ -209,7 +347,7 @@ export default function SettingsScreen() {
       </Pressable>
 
       <Text style={styles.note}>
-        ※ 通知は、アプリを開いた日から先の日数分まで予約されます（時刻の数によって変わります）。ときどきアプリを開くと、予約が自動で延長されます。
+        ※ 通知は、アプリを開いた日から先30日までの、選んだ曜日に予約されます。時刻の数が多いと、先の予約日数は短くなります。ときどきアプリを開くと、予約が自動で延長されます。
       </Text>
     </ScrollView>
   );
@@ -257,7 +395,43 @@ const styles = StyleSheet.create({
   stepButtonText: { color: colors.accent, fontSize: 18, fontWeight: '600' },
   stepValue: { fontSize: 18, color: colors.text, minWidth: 52, textAlign: 'center' },
   stepUnit: { fontSize: 12, color: colors.subText },
-  removeButton: { alignSelf: 'flex-end', marginTop: 10 },
+  subLabel: { fontSize: 12, color: colors.subText, marginTop: 14, marginBottom: 6 },
+  days: { flexDirection: 'row', justifyContent: 'space-between' },
+  dayChip: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.card,
+  },
+  dayChipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  dayText: { fontSize: 13, color: colors.subText, fontWeight: '600' },
+  dayTextOn: { color: '#fff' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: colors.card,
+  },
+  chipSelected: { borderColor: colors.accent, backgroundColor: colors.accent },
+  chipText: { fontSize: 13, color: colors.subText, fontWeight: '600' },
+  chipTextSelected: { color: '#fff' },
+  pickButton: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 999,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  pickText: { color: colors.accent, fontSize: 13, fontWeight: '600' },
+  removeButton: { alignSelf: 'flex-end', marginTop: 12 },
   removeText: { fontSize: 12, color: colors.danger },
   addButton: {
     marginTop: 14,
@@ -269,17 +443,6 @@ const styles = StyleSheet.create({
   },
   addButtonText: { color: colors.accent, fontSize: 14, fontWeight: '600' },
   warn: { marginTop: 14, fontSize: 12, color: colors.danger, lineHeight: 18 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  chipSelected: { borderColor: colors.accent, backgroundColor: colors.accent },
-  chipText: { fontSize: 13, color: colors.subText, fontWeight: '600' },
-  chipTextSelected: { color: '#fff' },
   testButton: {
     marginTop: 20,
     borderWidth: 1,
