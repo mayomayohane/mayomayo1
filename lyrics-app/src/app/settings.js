@@ -42,8 +42,31 @@ function shiftTime(alarm, minutesDelta) {
   return { hour: Math.floor(total / 60), minute: total % 60 };
 }
 
+// 曜日の要約（例：毎日・平日・週末・月、水、金）
+function dayLabel(days) {
+  const sorted = [...days].sort();
+  const same = (a) => a.length === sorted.length && a.every((d, i) => d === sorted[i]);
+  if (same([0, 1, 2, 3, 4, 5, 6])) return '毎日';
+  if (same([1, 2, 3, 4, 5])) return '平日';
+  if (same([0, 6])) return '週末';
+  return sorted.map((d) => WEEK_LABELS[d]).join('、');
+}
+
+// 届ける歌詞の要約（例：全部から・アルバム名・選んだ歌詞 3件）
+function poolLabel(pool, albums) {
+  if (pool.type === 'album') {
+    const album = albums.find((a) => a.id === pool.albumId);
+    return album ? album.name : '（アルバムなし）';
+  }
+  if (pool.type === 'lyrics') return `選んだ歌詞 ${(pool.lyricIds ?? []).length}件`;
+  return '全部から';
+}
+
 // 届く時刻（アラーム）1件分の表示と操作
 function AlarmRow({ alarm, albums, disabled, onChange, onRemove, onPickLyrics }) {
+  // 曜日と届ける歌詞の詳しい設定を開いているか（通常は閉じておく）
+  const [open, setOpen] = useState(false);
+
   // 時は1時間ずつ、分は15分ずつ変える（分は時をまたいで自動で進む）
   const changeHour = (d) => onChange({ hour: (alarm.hour + d + 24) % 24 });
   const changeMinute = (d) => onChange(shiftTime(alarm, d));
@@ -107,6 +130,15 @@ function AlarmRow({ alarm, albums, disabled, onChange, onRemove, onPickLyrics })
         />
       </View>
 
+      <Text style={styles.summary}>
+        {dayLabel(alarm.days)} ・ {poolLabel(alarm.pool, albums)}
+      </Text>
+      <Pressable onPress={() => setOpen((v) => !v)} style={styles.detailButton}>
+        <Text style={styles.detailButtonText}>{open ? '閉じる ▲' : '詳しく設定 ▼'}</Text>
+      </Pressable>
+
+      {open && (
+        <>
       <Text style={styles.subLabel}>届く曜日</Text>
       <View style={styles.days}>
         {WEEK_LABELS.map((label, day) => {
@@ -163,6 +195,9 @@ function AlarmRow({ alarm, albums, disabled, onChange, onRemove, onPickLyrics })
         <Pressable onPress={onPickLyrics} disabled={disabled} style={styles.pickButton}>
           <Text style={styles.pickText}>歌詞を選ぶ（{(pool.lyricIds ?? []).length}件）</Text>
         </Pressable>
+      )}
+
+        </>
       )}
 
       <Pressable onPress={onRemove} hitSlop={8} style={styles.removeButton}>
@@ -395,6 +430,17 @@ const styles = StyleSheet.create({
   stepButtonText: { color: colors.accent, fontSize: 18, fontWeight: '600' },
   stepValue: { fontSize: 18, color: colors.text, minWidth: 52, textAlign: 'center' },
   stepUnit: { fontSize: 12, color: colors.subText },
+  summary: { fontSize: 13, color: colors.text, marginTop: 12 },
+  detailButton: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  detailButtonText: { fontSize: 12, color: colors.accent, fontWeight: '600' },
   subLabel: { fontSize: 12, color: colors.subText, marginTop: 14, marginBottom: 6 },
   days: { flexDirection: 'row', justifyContent: 'space-between' },
   dayChip: {
