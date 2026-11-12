@@ -18,6 +18,17 @@ export const MUSIC_APPS = [
     label: 'YouTube Music',
     search: (q) => `https://music.youtube.com/search?q=${encodeURIComponent(q)}`,
   },
+  {
+    key: 'line',
+    label: 'LINE MUSIC',
+    // 検索ページの形式は実機で開いて確認すること
+    search: (q) => `https://music.line.me/search/${encodeURIComponent(q)}`,
+  },
+  {
+    key: 'amazon',
+    label: 'Amazon Music',
+    search: (q) => `https://music.amazon.co.jp/search/${encodeURIComponent(q)}`,
+  },
 ];
 
 // 「open.spotify.com/...」のように https:// を省いて貼られても開けるようにする。
