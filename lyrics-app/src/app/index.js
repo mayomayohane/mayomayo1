@@ -11,24 +11,24 @@ function formatDate(iso) {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }
 
+// 編集ボタンは、タップで開く部分（Pressable）の外に置く。
+// 中に入れると、カード全体のタップが先に反応して編集が開かなくなるため。
 function LyricCard({ lyric, highlighted, onPress, onEdit, onLongPress }) {
   const song = [lyric.title, lyric.artist].filter(Boolean).join(' / ');
   return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
-      style={[styles.card, highlighted && styles.cardHighlighted]}
-    >
-      <Text style={styles.lyricText}>{lyric.text}</Text>
-      <Text style={styles.song}>— {song}</Text>
-      {lyric.memo ? <Text style={styles.memo}>{lyric.memo}</Text> : null}
+    <View style={[styles.card, highlighted && styles.cardHighlighted]}>
+      <Pressable onPress={onPress} onLongPress={onLongPress}>
+        <Text style={styles.lyricText}>{lyric.text}</Text>
+        <Text style={styles.song}>— {song}</Text>
+        {lyric.memo ? <Text style={styles.memo}>{lyric.memo}</Text> : null}
+      </Pressable>
       <View style={styles.cardFooter}>
         <Text style={styles.date}>{formatDate(lyric.createdAt)}</Text>
         <Pressable onPress={onEdit} hitSlop={8} style={styles.editButton}>
           <Text style={styles.editText}>編集</Text>
         </Pressable>
       </View>
-    </Pressable>
+    </View>
   );
 }
 
