@@ -30,14 +30,21 @@ export async function saveSettings(settings) {
   await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
-// 保存する歌詞ひとつ分のデータを作る。
-export function createLyric({ text, title, artist, memo }) {
+// 入力欄の値を整える（前後の空白を取る）。保存と編集で同じ処理を使う。
+export function cleanLyricFields({ text, title, artist, memo }) {
   return {
-    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     text: text.trim(),
     title: title.trim(),
     artist: artist.trim(),
     memo: memo.trim(),
+  };
+}
+
+// 保存する歌詞ひとつ分のデータを作る。
+export function createLyric(input) {
+  return {
+    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    ...cleanLyricFields(input),
     createdAt: new Date().toISOString(),
   };
 }

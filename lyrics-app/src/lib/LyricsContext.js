@@ -2,6 +2,7 @@
 // React の Context（コンテキスト）を使うと、画面をまたいでデータを共有できます。
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
+  cleanLyricFields,
   createLyric,
   defaultSettings,
   loadLyrics,
@@ -49,6 +50,18 @@ export function LyricsProvider({ children }) {
     rescheduleNotifications(next, settingsRef.current).catch(console.warn);
   }, []);
 
+  // 保存済みの歌詞の内容を書き換える（作成日はそのまま、更新日を記録する）。
+  const updateLyric = useCallback(async (id, input) => {
+    const next = lyricsRef.current.map((l) =>
+      l.id === id
+        ? { ...l, ...cleanLyricFields(input), updatedAt: new Date().toISOString() }
+        : l
+    );
+    setLyrics(next);
+    await saveLyrics(next);
+    rescheduleNotifications(next, settingsRef.current).catch(console.warn);
+  }, []);
+
   const removeLyric = useCallback(async (id) => {
     const next = lyricsRef.current.filter((l) => l.id !== id);
     setLyrics(next);
@@ -66,7 +79,7 @@ export function LyricsProvider({ children }) {
 
   return (
     <LyricsContext.Provider
-      value={{ lyrics, settings, loaded, addLyric, removeLyric, updateSettings }}
+      value={{ lyrics, settings, loaded, addLyric, updateLyric, removeLyric, updateSettings }}
     >
       {children}
     </LyricsContext.Provider>

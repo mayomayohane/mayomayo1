@@ -10,7 +10,7 @@ function formatDate(iso) {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-function LyricCard({ lyric, highlighted, onLongPress }) {
+function LyricCard({ lyric, highlighted, onEdit, onLongPress }) {
   const song = [lyric.title, lyric.artist].filter(Boolean).join(' / ');
   return (
     <Pressable
@@ -20,7 +20,12 @@ function LyricCard({ lyric, highlighted, onLongPress }) {
       <Text style={styles.lyricText}>{lyric.text}</Text>
       <Text style={styles.song}>— {song}</Text>
       {lyric.memo ? <Text style={styles.memo}>{lyric.memo}</Text> : null}
-      <Text style={styles.date}>{formatDate(lyric.createdAt)}</Text>
+      <View style={styles.cardFooter}>
+        <Text style={styles.date}>{formatDate(lyric.createdAt)}</Text>
+        <Pressable onPress={onEdit} hitSlop={8} style={styles.editButton}>
+          <Text style={styles.editText}>編集</Text>
+        </Pressable>
+      </View>
     </Pressable>
   );
 }
@@ -79,6 +84,7 @@ export default function ListScreen() {
         <LyricCard
           lyric={item}
           highlighted={item.id === shuffledId}
+          onEdit={() => router.push({ pathname: '/edit', params: { id: item.id } })}
           onLongPress={() => confirmDelete(item)}
         />
       )}
@@ -123,7 +129,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
   },
-  date: { marginTop: 10, fontSize: 11, color: colors.subText },
+  cardFooter: {
+    marginTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  date: { fontSize: 11, color: colors.subText },
+  editButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  editText: { fontSize: 12, color: colors.accent, fontWeight: '600' },
   footer: { textAlign: 'center', color: colors.subText, fontSize: 12, marginTop: 8 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyTitle: { fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: 10 },

@@ -46,6 +46,11 @@ export default function RootLayout() {
             tabBarIcon: (p) => <TabIcon name="add-circle-outline" {...p} />,
           }}
         />
+        {/* 編集画面はタブには出さず、一覧の「編集」ボタンから開く */}
+        <Tabs.Screen
+          name="edit"
+          options={{ title: '歌詞を編集', href: null }}
+        />
         <Tabs.Screen
           name="settings"
           options={{
