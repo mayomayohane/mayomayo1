@@ -1,30 +1,12 @@
-// 保存済みの歌詞を後から編集する画面。一覧のカードの「編集」から開きます。
+// 保存済みの歌詞を編集するフォーム。一覧画面の中に表示します。
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import LyricForm from '../components/LyricForm';
+import LyricForm from './LyricForm';
 import { useLyrics } from '../lib/LyricsContext';
 import { colors } from '../lib/theme';
 
-export default function EditScreen() {
-  const { id } = useLocalSearchParams();
-  const { lyrics, loaded } = useLyrics();
-
-  // 読み込みが終わるまでは何も出さない（起動直後は一覧が空のため）
-  if (!loaded) return null;
-
-  const lyric = lyrics.find((l) => l.id === id);
-  if (!lyric) {
-    return (
-      <Text style={styles.notFound}>この歌詞は見つかりませんでした。</Text>
-    );
-  }
-
-  // id が変わったとき（別の歌詞を編集するとき）に入力欄を作り直すため key を付ける
-  return <EditForm key={lyric.id} lyric={lyric} />;
-}
-
-function EditForm({ lyric }) {
+// lyric：編集する歌詞、onDone：保存またはキャンセルしたとき（一覧に戻る）に呼ばれる
+export default function EditForm({ lyric, onDone }) {
   const { updateLyric } = useLyrics();
   // 入力欄の初期値は、保存されている内容
   const [values, setValues] = useState({
@@ -44,7 +26,7 @@ function EditForm({ lyric }) {
   async function handleSave() {
     if (!canSave) return;
     await updateLyric(lyric.id, values);
-    router.back(); // 一覧画面へ戻る
+    onDone();
   }
 
   return (
@@ -67,6 +49,9 @@ function EditForm({ lyric }) {
         >
           <Text style={styles.buttonText}>変更を保存</Text>
         </Pressable>
+        <Pressable onPress={onDone} style={styles.cancelButton}>
+          <Text style={styles.cancelText}>変更せずに一覧へ戻る</Text>
+        </Pressable>
         {!canSave && <Text style={styles.hint}>* の項目を入力すると保存できます。</Text>}
       </ScrollView>
     </KeyboardAvoidingView>
@@ -75,7 +60,6 @@ function EditForm({ lyric }) {
 
 const styles = StyleSheet.create({
   container: { padding: 20, paddingBottom: 60 },
-  notFound: { padding: 24, color: colors.subText, textAlign: 'center' },
   hint: { fontSize: 12, color: colors.subText, marginTop: 6 },
   button: {
     marginTop: 28,
@@ -86,4 +70,6 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { backgroundColor: '#D9CFC4' },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  cancelButton: { marginTop: 14, paddingVertical: 10, alignItems: 'center' },
+  cancelText: { color: colors.subText, fontSize: 14 },
 });

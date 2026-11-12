@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
+import EditForm from '../components/EditForm';
 import { useLyrics } from '../lib/LyricsContext';
 import { openLyricLink } from '../lib/musicLinks';
 import { colors, lyricFont } from '../lib/theme';
@@ -35,6 +36,8 @@ function LyricCard({ lyric, highlighted, onPress, onEdit, onLongPress }) {
 export default function ListScreen() {
   const { lyrics, loaded, settings, removeLyric } = useLyrics();
   const [shuffledId, setShuffledId] = useState(null);
+  // 編集中の歌詞のid。ここに値があるときは、一覧の代わりに編集フォームを表示する。
+  const [editingId, setEditingId] = useState(null);
 
   // カードをタップ：曲のURL、なければ設定の音楽アプリで検索して開く
   async function playLyric(lyric) {
@@ -59,6 +62,14 @@ export default function ListScreen() {
   }
 
   if (!loaded) return null;
+
+  // 編集中：一覧の代わりに、その歌詞の編集フォームを表示する
+  const editing = editingId ? lyrics.find((l) => l.id === editingId) : null;
+  if (editing) {
+    return (
+      <EditForm key={editing.id} lyric={editing} onDone={() => setEditingId(null)} />
+    );
+  }
 
   if (lyrics.length === 0) {
     return (
@@ -104,7 +115,7 @@ export default function ListScreen() {
           lyric={item}
           highlighted={item.id === shuffledId}
           onPress={() => playLyric(item)}
-          onEdit={() => router.push({ pathname: '/edit', params: { id: item.id } })}
+          onEdit={() => setEditingId(item.id)}
           onLongPress={() => confirmDelete(item)}
         />
       )}
